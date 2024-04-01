@@ -158,6 +158,7 @@ func main() {
 				SchemaVersion: 1,
 				Label:         "Reproducible Builds",
 				LabelColor:    "1e5b96",
+				Color:         ternary(dependencyMetadata.Latest.Reproducible, "ok", "error"),
 				Message:       ternary(dependencyMetadata.Latest.Reproducible, "ok", "error"),
 				IsError:       dependencyMetadata.Latest.Reproducible == false,
 				Style:         "flat",
