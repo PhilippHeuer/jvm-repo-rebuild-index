@@ -18,6 +18,7 @@ The generated index files are hosted on GitHub Pages and can be accessed using t
 | `https://philippheuer.me/reproducible-central-index/index.json`                        | All artifacts                  |
 | `https://philippheuer.me/reproducible-central-index/{group}/{artifact}/index.json`     | By group and artifact          |
 | `https://philippheuer.me/reproducible-central-index/{group}/{artifact}/{version}.json` | By group, artifact and version |
+| `https://philippheuer.me/reproducible-central-index/{group}/{artifact}/badge.json`     | for shields.io endpoint badge  |
 
 _Examples:_
 
@@ -31,7 +32,16 @@ com.fasterxml.jackson.core:jackson-databind:2.17.0
 
 ## Badges
 
-...
+You can use the `Endpoint Badge` of shields.io to display the reproducibility status of the latest release:
+
+```markdown
+# example for com.fasterxml.jackson.core:jackson-databind
+![Reproducible Builds](https://img.shields.io/endpoint?url=https%3A%2F%2Fphilippheuer.me%2Freproducible-central-index%2Fcom%2Ffasterxml%2Fjackson%2Fcore%2Fjackson-databind%2Fbadge.json)
+```
+
+Demo:
+
+![Reproducible Builds](https://img.shields.io/endpoint?url=https%3A%2F%2Fphilippheuer.me%2Freproducible-central-index%2Fcom%2Ffasterxml%2Fjackson%2Fcore%2Fjackson-databind%2Fbadge.json)
 
 ## License
 

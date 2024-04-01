@@ -33,6 +33,16 @@ type VersionMetadata struct {
 	NotReproducibleFiles []string `json:"non_reproducible_files"`
 }
 
+type Badge struct {
+	SchemaVersion int    `json:"schemaVersion"`
+	Label         string `json:"label"`
+	Message       string `json:"message"`
+	Color         string `json:"color,omitempty"`
+	LabelColor    string `json:"labelColor"`
+	IsError       bool   `json:"isError"`
+	Style         string `json:"style"`
+}
+
 func main() {
 	inputDir := os.Args[1]
 	outputDir := os.Args[2]
@@ -142,6 +152,23 @@ func main() {
 			os.Exit(1)
 		}
 
+		// project badge
+		if dependencyMetadata.Latest.Version != "" {
+			badge := Badge{
+				SchemaVersion: 1,
+				Label:         "Reproducible Builds",
+				LabelColor:    "1e5b96",
+				Message:       ternary(dependencyMetadata.Latest.Reproducible, "ok", "error"),
+				IsError:       dependencyMetadata.Latest.Reproducible == false,
+				Style:         "flat",
+			}
+			writeErr = writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), "badge.json"), badge)
+			if writeErr != nil {
+				slog.Error("failed to write artifact metadata to file", "error", writeErr)
+				os.Exit(1)
+			}
+		}
+
 		allMetadata[dependencyMetadata.GroupID+":"+dependencyMetadata.ArtifactID] = dependencyMetadata
 	}
 
@@ -224,4 +251,11 @@ func writeToFile(filename string, data any) error {
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(data)
+}
+
+func ternary[T any](condition bool, trueVal T, falseVal T) T {
+	if condition {
+		return trueVal
+	}
+	return falseVal
 }
