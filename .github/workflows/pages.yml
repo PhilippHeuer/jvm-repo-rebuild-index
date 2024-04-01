@@ -1,0 +1,46 @@
+# name
+name: publish-index
+
+# triggers
+on:
+  # allow manual triggering
+  workflow_dispatch:
+  # run every 3 hours
+  schedule:
+  - cron: '0 */3 * * *'
+
+# jobs
+jobs:
+  # build index
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+      - name: clone reproducible-central
+        run: |
+          git clone https://github.com/jvm-repo-rebuild/reproducible-central.git /tmp/reproducible-central --depth 1
+      - name: generate index
+        run: |
+          go run main.go /tmp/reproducible-central/content index
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'index'
+
+  # deploy generated index files to github pages
+  deploy:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{steps.deployment.outputs.page_url}}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
