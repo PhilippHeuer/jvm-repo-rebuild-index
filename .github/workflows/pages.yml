@@ -5,9 +5,9 @@ name: publish-index
 on:
   # allow manual triggering
   workflow_dispatch:
-  # run every 3 hours
+  # run every 12 hours
   schedule:
-  - cron: '0 */3 * * *'
+    - cron: "0 */12 * * *"
 
 # jobs
 jobs:
@@ -27,7 +27,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'index'
+          path: "index"
 
   # deploy generated index files to github pages
   deploy:
