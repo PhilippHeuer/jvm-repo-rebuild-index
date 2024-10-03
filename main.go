@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/charlievieth/fastwalk"
@@ -44,6 +45,10 @@ type Badge struct {
 }
 
 func main() {
+	if len(os.Args) != 3 {
+		slog.Error("usage: <inputDir> <outputDir>")
+		os.Exit(1)
+	}
 	inputDir := os.Args[1]
 	outputDir := os.Args[2]
 	slog.Info("generating index", "inputDir", inputDir, "outputDir", outputDir)
@@ -56,122 +61,23 @@ func main() {
 	}
 
 	allMetadata := make(map[string]DependencyMetadata)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
 	for _, mvnMetadataFile := range files {
-		dependencyMetadata := DependencyMetadata{
-			Versions: make(map[string]VersionMetadata),
-		}
-		dir := filepath.Dir(mvnMetadataFile)
-		slog.Debug("found project", "path", mvnMetadataFile, "dir", filepath.Dir(mvnMetadataFile))
+		wg.Add(1)
 
-		buildInfoFiles, err := findFiles(dir, ".buildinfo")
-		if err != nil {
-			slog.Error("failed to find maven-metadata.xml files", "error", err)
-			os.Exit(1)
-		}
+		go func(file string) {
+			defer wg.Done()
+			dependencyMetadata := processFile(file, outputDir)
 
-		slog.Debug("found buildinfo files", "count", len(buildInfoFiles))
-		for _, buildInfoFile := range buildInfoFiles {
-			slog.Debug("found buildinfo file", "path", buildInfoFile, "dir", filepath.Dir(buildInfoFile))
-
-			buildInfo, err := parseFile(buildInfoFile)
-			if err != nil {
-				slog.Error("failed to parse buildinfo file", "error", err)
-				continue
-			}
-			buildCompare, err := parseFile(strings.Replace(buildInfoFile, ".buildinfo", ".buildcompare", 1))
-			if err != nil {
-				slog.Error("failed to parse buildinfo file", "error", err)
-				continue
-			}
-
-			buildInfoVersion := buildInfo["buildinfo.version"]
-			if buildInfoVersion != "" && buildInfoVersion != "1.0-SNAPSHOT" {
-				slog.Error("failed to find a supported buildinfo.version in buildinfo file", "file", buildInfoFile, "version", buildInfoVersion)
-				continue
-			}
-
-			versionMetadata := VersionMetadata{
-				Version:      buildCompare["version"],
-				DisplayName:  buildInfo["name"],
-				SCMUri:       buildInfo["source.scm.uri"],
-				SCMTag:       buildInfo["source.scm.tag"],
-				BuildTool:    buildInfo["build-tool"],
-				JavaVersion:  buildInfo["java.version"],
-				OSName:       buildInfo["os.name"],
-				Reproducible: buildCompare["ko"] == "0" && buildCompare["ok"] != "0",
-			}
-			if rf, ok := buildCompare["okFiles"]; ok && rf == "" {
-				versionMetadata.ReproducibleFiles = make([]string, 0)
-			} else {
-				versionMetadata.ReproducibleFiles = strings.Split(rf, " ")
-			}
-			if rf, ok := buildCompare["koFiles"]; ok && rf == "" {
-				versionMetadata.NotReproducibleFiles = make([]string, 0)
-			} else {
-				versionMetadata.NotReproducibleFiles = strings.Split(rf, " ")
-			}
-			slog.Debug("parsed buildinfo data", "content", versionMetadata)
-
-			dependencyMetadata.GroupID = buildInfo["group-id"]
-			dependencyMetadata.ArtifactID = buildInfo["artifact-id"]
-			dependencyMetadata.Versions[versionMetadata.Version] = versionMetadata
-
-			// write version metadata to file
-			writeErr := writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), versionMetadata.Version+".json"), versionMetadata)
-			if writeErr != nil {
-				slog.Error("failed to write artifact metadata to file", "error", writeErr)
-				os.Exit(1)
-			}
-		}
-
-		// sort versions and find latest
-		if len(dependencyMetadata.Versions) > 0 {
-			var versions []*semver.Version
-			for _, version := range dependencyMetadata.Versions {
-				v, vErr := semver.NewVersion(version.Version)
-				if vErr != nil {
-					slog.Error("failed to parse version", "version", version.Version, "error", vErr)
-					continue
-				}
-
-				versions = append(versions, v)
-			}
-
-			if len(versions) > 0 {
-				sort.Sort(semver.Collection(versions))
-
-				latestVersion := versions[len(versions)-1].String()
-				dependencyMetadata.Latest = dependencyMetadata.Versions[latestVersion]
-			}
-		}
-
-		// write artifact metadata to file
-		writeErr := writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), "index.json"), dependencyMetadata)
-		if writeErr != nil {
-			slog.Error("failed to write artifact metadata to file", "error", writeErr)
-			os.Exit(1)
-		}
-
-		// project badge
-		if dependencyMetadata.Latest.Version != "" {
-			badge := Badge{
-				SchemaVersion: 1,
-				Label:         "Reproducible Builds",
-				LabelColor:    "1e5b96",
-				Color:         ternary(dependencyMetadata.Latest.Reproducible, "ok", "error"),
-				Message:       ternary(dependencyMetadata.Latest.Reproducible, "ok", "error"),
-				IsError:       dependencyMetadata.Latest.Reproducible == false,
-				Style:         "flat",
-			}
-			writeErr = writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), "badge.json"), badge)
-			if writeErr != nil {
-				slog.Error("failed to write artifact metadata to file", "error", writeErr)
-				os.Exit(1)
-			}
-		}
-
-		allMetadata[dependencyMetadata.GroupID+":"+dependencyMetadata.ArtifactID] = dependencyMetadata
+			// safely add metadata to map
+			mu.Lock()
+			allMetadata[dependencyMetadata.GroupID+":"+dependencyMetadata.ArtifactID] = dependencyMetadata
+			mu.Unlock()
+		}(mvnMetadataFile)
 	}
+	wg.Wait()
+	slog.Info("generated index", "count", len(allMetadata))
 
 	// write all metadata to file
 	writeErr := writeToFile(filepath.Join(outputDir, "index.json"), allMetadata)
@@ -179,6 +85,129 @@ func main() {
 		slog.Error("failed to write artifact metadata to file", "error", writeErr)
 		os.Exit(1)
 	}
+}
+
+func processFile(mvnMetadataFile string, outputDir string) DependencyMetadata {
+	dependencyMetadata := DependencyMetadata{
+		Versions: make(map[string]VersionMetadata),
+	}
+	dir := filepath.Dir(mvnMetadataFile)
+	slog.Debug("found project", "path", mvnMetadataFile, "dir", filepath.Dir(mvnMetadataFile))
+
+	buildInfoFiles, err := findFiles(dir, ".buildinfo")
+	if err != nil {
+		slog.Error("failed to find maven-metadata.xml files", "error", err)
+		os.Exit(1)
+	}
+
+	slog.Debug("found buildinfo files", "count", len(buildInfoFiles))
+	for _, buildInfoFile := range buildInfoFiles {
+		slog.Debug("found buildinfo file", "path", buildInfoFile, "dir", filepath.Dir(buildInfoFile))
+
+		buildInfo, err := parseFile(buildInfoFile)
+		if err != nil {
+			slog.Error("failed to parse buildinfo file", "error", err)
+			continue
+		}
+		buildCompare, err := parseFile(strings.Replace(buildInfoFile, ".buildinfo", ".buildcompare", 1))
+		if err != nil {
+			slog.Error("failed to parse buildinfo file", "error", err)
+			continue
+		}
+
+		buildInfoVersion := buildInfo["buildinfo.version"]
+		if buildInfoVersion != "" && buildInfoVersion != "1.0-SNAPSHOT" {
+			slog.Error("failed to find a supported buildinfo.version in buildinfo file", "file", buildInfoFile, "version", buildInfoVersion)
+			continue
+		}
+
+		versionMetadata := VersionMetadata{
+			Version:      buildCompare["version"],
+			DisplayName:  buildInfo["name"],
+			SCMUri:       buildInfo["source.scm.uri"],
+			SCMTag:       buildInfo["source.scm.tag"],
+			BuildTool:    buildInfo["build-tool"],
+			JavaVersion:  buildInfo["java.version"],
+			OSName:       buildInfo["os.name"],
+			Reproducible: buildCompare["ko"] == "0" && buildCompare["ok"] != "0",
+		}
+		if rf, ok := buildCompare["okFiles"]; ok && rf == "" {
+			versionMetadata.ReproducibleFiles = make([]string, 0)
+		} else {
+			versionMetadata.ReproducibleFiles = strings.Split(rf, " ")
+		}
+		if rf, ok := buildCompare["koFiles"]; ok && rf == "" {
+			versionMetadata.NotReproducibleFiles = make([]string, 0)
+		} else {
+			versionMetadata.NotReproducibleFiles = strings.Split(rf, " ")
+		}
+		slog.Debug("parsed buildinfo data", "content", versionMetadata)
+
+		dependencyMetadata.GroupID = buildInfo["group-id"]
+		dependencyMetadata.ArtifactID = buildInfo["artifact-id"]
+		dependencyMetadata.Versions[versionMetadata.Version] = versionMetadata
+
+		// validate metadata
+		if dependencyMetadata.GroupID == "" || dependencyMetadata.ArtifactID == "" {
+			slog.Warn("failed to find group-id or artifact-id in buildinfo file", "file", buildInfoFile)
+			continue
+		}
+
+		// write version metadata to file
+		writeErr := writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), versionMetadata.Version+".json"), versionMetadata)
+		if writeErr != nil {
+			slog.Error("failed to write artifact metadata to file", "error", writeErr)
+			os.Exit(1)
+		}
+	}
+
+	// sort versions and find latest
+	if len(dependencyMetadata.Versions) > 0 {
+		var versions []*semver.Version
+		for _, version := range dependencyMetadata.Versions {
+			v, vErr := semver.NewVersion(version.Version)
+			if vErr != nil {
+				slog.Error("failed to parse version", "version", version.Version, "error", vErr)
+				continue
+			}
+
+			versions = append(versions, v)
+		}
+
+		if len(versions) > 0 {
+			sort.Sort(semver.Collection(versions))
+
+			latestVersion := versions[len(versions)-1].String()
+			dependencyMetadata.Latest = dependencyMetadata.Versions[latestVersion]
+		}
+	}
+
+	// write artifact metadata to file
+	writeErr := writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), "index.json"), dependencyMetadata)
+	if writeErr != nil {
+		slog.Error("failed to write artifact metadata to file", "error", writeErr)
+		os.Exit(1)
+	}
+
+	// project badge
+	if dependencyMetadata.Latest.Version != "" {
+		badge := Badge{
+			SchemaVersion: 1,
+			Label:         "Reproducible Builds",
+			LabelColor:    "1e5b96",
+			Color:         ternary(dependencyMetadata.Latest.Reproducible, "ok", "error"),
+			Message:       ternary(dependencyMetadata.Latest.Reproducible, "ok", "error"),
+			IsError:       dependencyMetadata.Latest.Reproducible == false,
+			Style:         "flat",
+		}
+		writeErr = writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), "badge.json"), badge)
+		if writeErr != nil {
+			slog.Error("failed to write artifact metadata to file", "error", writeErr)
+			os.Exit(1)
+		}
+	}
+
+	return dependencyMetadata
 }
 
 func findFiles(rootPath string, suffix string) ([]string, error) {
