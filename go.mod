@@ -1,4 +1,4 @@
-module github.com/philippheuer/jvm-repo-rebuild-cli
+module github.com/philippheuer/reproducible-central-index
 
 go 1.22.1
 

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -11,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/charlievieth/fastwalk"
+	"github.com/philippheuer/reproducible-central-index/pkg/util"
 )
 
 type DependencyMetadata struct {
@@ -27,8 +25,8 @@ type VersionMetadata struct {
 	SCMUri               string   `json:"scm_uri,omitempty"`
 	SCMTag               string   `json:"scm_tag,omitempty"`
 	BuildTool            string   `json:"build_tool,omitempty"`
-	JavaVersion          string   `json:"java_version,omitempty"`
-	OSName               string   `json:"os_name,omitempty"`
+	BuildJavaVersion     string   `json:"build_java_version,omitempty"`
+	BuildOSName          string   `json:"build_os_name,omitempty"`
 	Reproducible         bool     `json:"reproducible"`
 	ReproducibleFiles    []string `json:"reproducible_files"`
 	NotReproducibleFiles []string `json:"non_reproducible_files"`
@@ -54,7 +52,7 @@ func main() {
 	slog.Info("generating index", "inputDir", inputDir, "outputDir", outputDir)
 
 	// search for all maven-metadata.xml files in all subdirectories
-	files, filesErr := findFiles(inputDir, "maven-metadata.xml")
+	files, filesErr := util.FindFiles(inputDir, "maven-metadata.xml")
 	if filesErr != nil {
 		slog.Error("failed to find maven-metadata.xml files", "error", filesErr)
 		os.Exit(1)
@@ -80,7 +78,7 @@ func main() {
 	slog.Info("generated index", "count", len(allMetadata))
 
 	// write all metadata to file
-	writeErr := writeToFile(filepath.Join(outputDir, "index.json"), allMetadata)
+	writeErr := util.WriteToFile(filepath.Join(outputDir, "index.json"), allMetadata)
 	if writeErr != nil {
 		slog.Error("failed to write artifact metadata to file", "error", writeErr)
 		os.Exit(1)
@@ -94,7 +92,7 @@ func processFile(mvnMetadataFile string, outputDir string) DependencyMetadata {
 	dir := filepath.Dir(mvnMetadataFile)
 	slog.Debug("found project", "path", mvnMetadataFile, "dir", filepath.Dir(mvnMetadataFile))
 
-	buildInfoFiles, err := findFiles(dir, ".buildinfo")
+	buildInfoFiles, err := util.FindFiles(dir, ".buildinfo")
 	if err != nil {
 		slog.Error("failed to find maven-metadata.xml files", "error", err)
 		os.Exit(1)
@@ -104,12 +102,12 @@ func processFile(mvnMetadataFile string, outputDir string) DependencyMetadata {
 	for _, buildInfoFile := range buildInfoFiles {
 		slog.Debug("found buildinfo file", "path", buildInfoFile, "dir", filepath.Dir(buildInfoFile))
 
-		buildInfo, err := parseFile(buildInfoFile)
+		buildInfo, err := util.ParseFile(buildInfoFile)
 		if err != nil {
 			slog.Error("failed to parse buildinfo file", "error", err)
 			continue
 		}
-		buildCompare, err := parseFile(strings.Replace(buildInfoFile, ".buildinfo", ".buildcompare", 1))
+		buildCompare, err := util.ParseFile(strings.Replace(buildInfoFile, ".buildinfo", ".buildcompare", 1))
 		if err != nil {
 			slog.Error("failed to parse buildinfo file", "error", err)
 			continue
@@ -122,14 +120,14 @@ func processFile(mvnMetadataFile string, outputDir string) DependencyMetadata {
 		}
 
 		versionMetadata := VersionMetadata{
-			Version:      buildCompare["version"],
-			DisplayName:  buildInfo["name"],
-			SCMUri:       buildInfo["source.scm.uri"],
-			SCMTag:       buildInfo["source.scm.tag"],
-			BuildTool:    buildInfo["build-tool"],
-			JavaVersion:  buildInfo["java.version"],
-			OSName:       buildInfo["os.name"],
-			Reproducible: buildCompare["ko"] == "0" && buildCompare["ok"] != "0",
+			Version:          buildCompare["version"],
+			DisplayName:      buildInfo["name"],
+			SCMUri:           buildInfo["source.scm.uri"],
+			SCMTag:           buildInfo["source.scm.tag"],
+			BuildTool:        buildInfo["build-tool"],
+			BuildJavaVersion: buildInfo["java.version"],
+			BuildOSName:      buildInfo["os.name"],
+			Reproducible:     buildCompare["ko"] == "0" && buildCompare["ok"] != "0",
 		}
 		if rf, ok := buildCompare["okFiles"]; ok && rf == "" {
 			versionMetadata.ReproducibleFiles = make([]string, 0)
@@ -154,7 +152,7 @@ func processFile(mvnMetadataFile string, outputDir string) DependencyMetadata {
 		}
 
 		// write version metadata to file
-		writeErr := writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), versionMetadata.Version+".json"), versionMetadata)
+		writeErr := util.WriteToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), versionMetadata.Version+".json"), versionMetadata)
 		if writeErr != nil {
 			slog.Error("failed to write artifact metadata to file", "error", writeErr)
 			os.Exit(1)
@@ -183,7 +181,7 @@ func processFile(mvnMetadataFile string, outputDir string) DependencyMetadata {
 	}
 
 	// write artifact metadata to file
-	writeErr := writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), "index.json"), dependencyMetadata)
+	writeErr := util.WriteToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), "index.json"), dependencyMetadata)
 	if writeErr != nil {
 		slog.Error("failed to write artifact metadata to file", "error", writeErr)
 		os.Exit(1)
@@ -195,12 +193,12 @@ func processFile(mvnMetadataFile string, outputDir string) DependencyMetadata {
 			SchemaVersion: 1,
 			Label:         "Reproducible Builds",
 			LabelColor:    "1e5b96",
-			Color:         ternary(dependencyMetadata.Latest.Reproducible, "ok", "error"),
-			Message:       ternary(dependencyMetadata.Latest.Reproducible, "ok", "error"),
+			Color:         util.Ternary(dependencyMetadata.Latest.Reproducible, dependencyMetadata.Latest.Version+" - ok", dependencyMetadata.Latest.Version+" - error"),
+			Message:       util.Ternary(dependencyMetadata.Latest.Reproducible, dependencyMetadata.Latest.Version+" - ok", dependencyMetadata.Latest.Version+" - error"),
 			IsError:       dependencyMetadata.Latest.Reproducible == false,
 			Style:         "flat",
 		}
-		writeErr = writeToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), "badge.json"), badge)
+		writeErr = util.WriteToFile(filepath.Join(outputDir, strings.ReplaceAll(dependencyMetadata.GroupID, ".", "/"), strings.ReplaceAll(dependencyMetadata.ArtifactID, ".", "/"), "badge.json"), badge)
 		if writeErr != nil {
 			slog.Error("failed to write artifact metadata to file", "error", writeErr)
 			os.Exit(1)
@@ -208,84 +206,4 @@ func processFile(mvnMetadataFile string, outputDir string) DependencyMetadata {
 	}
 
 	return dependencyMetadata
-}
-
-func findFiles(rootPath string, suffix string) ([]string, error) {
-	var files []string
-
-	conf := fastwalk.Config{
-		Follow: false,
-	}
-	err := fastwalk.Walk(&conf, rootPath, func(path string, info fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.Name() == ".git" {
-			return filepath.SkipDir
-		}
-		if info.IsDir() == false && strings.HasSuffix(filepath.Base(path), suffix) {
-			files = append(files, path)
-		}
-		return nil
-	})
-
-	return files, err
-}
-
-func parseFile(filename string) (map[string]string, error) {
-	content, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	return parseProperties(string(content)), nil
-}
-
-func parseProperties(content string) map[string]string {
-	properties := make(map[string]string)
-
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) == 2 {
-			key := strings.TrimSpace(parts[0])
-			value := strings.TrimSpace(parts[1])
-			if strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"") {
-				value = value[1 : len(value)-1]
-			}
-
-			properties[key] = value
-		}
-	}
-
-	return properties
-}
-
-func writeToFile(filename string, data any) error {
-	if err := os.MkdirAll(filepath.Dir(filename), os.ModePerm); err != nil {
-		return err
-	}
-
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(data)
-}
-
-func ternary[T any](condition bool, trueVal T, falseVal T) T {
-	if condition {
-		return trueVal
-	}
-	return falseVal
 }
