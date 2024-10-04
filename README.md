@@ -14,12 +14,12 @@ The index is updated automatically using GitHub Actions and published to GitHub 
 
 The generated index files are hosted on GitHub Pages and can be accessed using the following URLs:
 
-| URL                                                                                           | Description                    |
-|-----------------------------------------------------------------------------------------------|--------------------------------|
-| `https://philippheuer.github.io/reproducible-central-index/index.json`                        | All artifacts                  |
-| `https://philippheuer.github.io/reproducible-central-index/{group}/{artifact}/index.json`     | By group and artifact          |
-| `https://philippheuer.github.io/reproducible-central-index/{group}/{artifact}/{version}.json` | By group, artifact and version |
-| `https://philippheuer.github.io/reproducible-central-index/{group}/{artifact}/badge.json`     | for shields.io endpoint badge  |
+| URL                                                                                           | Description                                                |
+|-----------------------------------------------------------------------------------------------|------------------------------------------------------------|
+| `https://philippheuer.github.io/reproducible-central-index/index.json`                        | All artifacts (currently disabled, due to large file size) |
+| `https://philippheuer.github.io/reproducible-central-index/{group}/{artifact}/index.json`     | By group and artifact                                      |
+| `https://philippheuer.github.io/reproducible-central-index/{group}/{artifact}/{version}.json` | By group, artifact and version                             |
+| `https://philippheuer.github.io/reproducible-central-index/{group}/{artifact}/badge.json`     | for shields.io badge endpoint                              |
 
 _Examples:_
 
