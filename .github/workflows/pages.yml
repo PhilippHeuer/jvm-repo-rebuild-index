@@ -21,9 +21,9 @@ jobs:
       - name: clone reproducible-central
         run: |
           git clone https://github.com/jvm-repo-rebuild/reproducible-central.git /tmp/reproducible-central --depth 1
-      - name: generate index
+      - name: index reproducible-central
         run: |
-          go run main.go /tmp/reproducible-central/content index
+          go run main.go /tmp/reproducible-central/content index/central
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

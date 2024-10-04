@@ -1,2 +1,6 @@
 # upstream dir
 data
+
+# generated index
+index/*/*
+!index/*

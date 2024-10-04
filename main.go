@@ -23,7 +23,7 @@ type DependencyMetadata struct {
 }
 
 type VersionMetadata struct {
-	DisplayName          string              `json:"display_name,omitempty"`
+	Project              string              `json:"project,omitempty"`
 	SCMUri               string              `json:"scm_uri,omitempty"`
 	SCMTag               string              `json:"scm_tag,omitempty"`
 	BuildTool            string              `json:"build_tool,omitempty"`
@@ -204,7 +204,7 @@ func processFile(mvnMetadataFile string, outputDir string) (map[string]*Dependen
 			}
 
 			versionMetadata := VersionMetadata{
-				DisplayName:      buildInfo["name"],
+				Project:          buildInfo["name"],
 				SCMUri:           buildInfo["source.scm.uri"],
 				SCMTag:           buildInfo["source.scm.tag"],
 				BuildTool:        buildInfo["build-tool"],

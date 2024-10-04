@@ -79,7 +79,7 @@ func WriteToFile(filename string, data any) error {
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
+	// encoder.SetIndent("", "  ") // pretty print
 	return encoder.Encode(data)
 }
 

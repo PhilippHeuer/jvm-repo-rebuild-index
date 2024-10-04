@@ -1,0 +1,7 @@
+{
+  "repositories": {
+    "repo.maven.apache.org/maven2": {
+      "name": "central"
+    }
+  }
+}
