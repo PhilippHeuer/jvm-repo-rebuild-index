@@ -28,6 +28,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: "index"
+          retention-days: 1
 
   # deploy generated index files to github pages
   deploy:
