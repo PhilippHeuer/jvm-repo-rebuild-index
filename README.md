@@ -16,29 +16,29 @@ Note: If any files of a given project version are not reproducible, the entire p
 
 The generated index files are hosted on GitHub Pages and can be accessed using the following URLs:
 
-| URL                                                                                                           | Description                                                |
-|---------------------------------------------------------------------------------------------------------------|------------------------------------------------------------|
-| `https://philippheuer.github.io/reproducible-central-index/index.json`                                        | All maven repositories                                     |
-| `https://philippheuer.github.io/reproducible-central-index/central/project/{group}/{artifact}/index.json`     | Query project data                                         |
-| `https://philippheuer.github.io/reproducible-central-index/central/project/{group}/{artifact}/{version}.json` | Query project by group, artifact and version               |
-| `https://philippheuer.github.io/reproducible-central-index/central/project/{group}/{artifact}/badge.json`     | Project shields.io badge endpoint                          |
-| `https://philippheuer.github.io/reproducible-central-index/central/maven/index.json`                          | All artifacts (currently disabled, due to large file size) |
-| `https://philippheuer.github.io/reproducible-central-index/central/maven/{group}/{artifact}/index.json`       | Query artifacts by group and artifact                      |
-| `https://philippheuer.github.io/reproducible-central-index/central/maven/{group}/{artifact}/{version}.json`   | Query artifacts by group, artifact and version             |
-| `https://philippheuer.github.io/reproducible-central-index/central/maven/{group}/{artifact}/badge.json`       | Artifact shields.io badge endpoint                         |
+| URL                                                                                                                | Description                                                |
+|--------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------|
+| `https://philippheuer.github.io/reproducible-central-index/index.json`                                             | All maven repositories                                     |
+| `https://philippheuer.github.io/reproducible-central-index/mavencentral/project/{group}/{artifact}/index.json`     | Query project data                                         |
+| `https://philippheuer.github.io/reproducible-central-index/mavencentral/project/{group}/{artifact}/{version}.json` | Query project by group, artifact and version               |
+| `https://philippheuer.github.io/reproducible-central-index/mavencentral/project/{group}/{artifact}/badge.json`     | Project shields.io badge endpoint                          |
+| `https://philippheuer.github.io/reproducible-central-index/mavencentral/maven/index.json`                          | All artifacts (currently disabled, due to large file size) |
+| `https://philippheuer.github.io/reproducible-central-index/mavencentral/maven/{group}/{artifact}/index.json`       | Query artifacts by group and artifact                      |
+| `https://philippheuer.github.io/reproducible-central-index/mavencentral/maven/{group}/{artifact}/{version}.json`   | Query artifacts by group, artifact and version             |
+| `https://philippheuer.github.io/reproducible-central-index/mavencentral/maven/{group}/{artifact}/badge.json`       | Artifact shields.io badge endpoint                         |
 
 ## Examples
 
 ```bash
 # project - io.github.xanthic.cache:cache-api
-https://philippheuer.github.io/reproducible-central-index/central/project/io/github/xanthic/cache/cache-api/index.json
+https://philippheuer.github.io/reproducible-central-index/mavencentral/project/io/github/xanthic/cache/cache-api/index.json
 # project - io.github.xanthic.cache:cache-api:0.6.2
-https://philippheuer.github.io/reproducible-central-index/central/project/io/github/xanthic/cache/cache-api/0.6.2.json
+https://philippheuer.github.io/reproducible-central-index/mavencentral/project/io/github/xanthic/cache/cache-api/0.6.2.json
 
 # artifact - io.github.xanthic.cache.cache-provider-caffeine3
-https://philippheuer.github.io/reproducible-central-index/central/maven/io/github/xanthic/cache/cache-provider-caffeine3/index.json
+https://philippheuer.github.io/reproducible-central-index/mavencentral/maven/io/github/xanthic/cache/cache-provider-caffeine3/index.json
 # artifact - io.github.xanthic.cache.cache-provider-caffeine3:0.6.2
-https://philippheuer.github.io/reproducible-central-index/central/maven/io/github/xanthic/cache/cache-provider-caffeine3/0.6.2.json
+https://philippheuer.github.io/reproducible-central-index/mavencentral/maven/io/github/xanthic/cache/cache-provider-caffeine3/0.6.2.json
 ```
 
 ## Badges
@@ -47,17 +47,17 @@ You can use the `Endpoint Badge` of shields.io to display the reproducibility st
 
 ```markdown
 # project - io.github.xanthic.cache:cache-api (all artifacts)
-![Reproducible Builds](https://img.shields.io/endpoint?url=https://philippheuer.github.io/reproducible-central-index/central/project/io/github/xanthic/cache/cache-api/badge.json)
+![Reproducible Builds](https://img.shields.io/endpoint?url=https://philippheuer.github.io/reproducible-central-index/mavencentral/project/io/github/xanthic/cache/cache-api/badge.json)
 ```
 
-![Reproducible Builds](https://img.shields.io/endpoint?url=https://philippheuer.github.io/reproducible-central-index/central/project/io/github/xanthic/cache/cache-api/badge.json)
+![Reproducible Builds](https://img.shields.io/endpoint?url=https://philippheuer.github.io/reproducible-central-index/mavencentral/project/io/github/xanthic/cache/cache-api/badge.json)
 
 ```markdown
 # artifact - io.github.xanthic.cache:cache-provider-caffeine3
-![Reproducible Builds](https://img.shields.io/endpoint?url=https://philippheuer.github.io/reproducible-central-index/central/maven/io/github/xanthic/cache/cache-provider-caffeine3/badge.json)
+![Reproducible Builds](https://img.shields.io/endpoint?url=https://philippheuer.github.io/reproducible-central-index/mavencentral/maven/io/github/xanthic/cache/cache-provider-caffeine3/badge.json)
 ```
 
-![Reproducible Builds](https://img.shields.io/endpoint?url=https://philippheuer.github.io/reproducible-central-index/central/maven/io/github/xanthic/cache/cache-provider-caffeine3/badge.json)
+![Reproducible Builds](https://img.shields.io/endpoint?url=https://philippheuer.github.io/reproducible-central-index/mavencentral/maven/io/github/xanthic/cache/cache-provider-caffeine3/badge.json)
 
 ## FAQ
 
@@ -77,3 +77,5 @@ Therefore, the index reports all artifacts of a project version as non-reproduci
 ## License
 
 The code is released under the [MIT license](./LICENSE).
+
+The included logos are trademarks of their respective owners and are not covered by the license.
