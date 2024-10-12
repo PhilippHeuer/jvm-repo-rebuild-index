@@ -12,8 +12,8 @@ import (
 	"sync"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/philippheuer/reproducible-central-index/pkg/model"
-	"github.com/philippheuer/reproducible-central-index/pkg/util"
+	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/model"
+	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -317,6 +317,7 @@ func writeProjectIndexToFilesystem(outputDir string, data map[string]*model.Proj
 			}
 
 			// write badge data
+			/* TODO: enable or remove, i prefer rendering badges via api
 			if data.Latest != "" {
 				latestVersion, latestVersionFound := data.Versions[data.Latest]
 				if latestVersionFound {
@@ -336,6 +337,7 @@ func writeProjectIndexToFilesystem(outputDir string, data map[string]*model.Proj
 					}
 				}
 			}
+			*/
 		}(current)
 	}
 	wmg.Wait()
@@ -374,6 +376,7 @@ func writeDependencyIndexToFilesystem(outputDir string, data map[string]*model.D
 			}
 
 			// write badge data
+			/* TODO: enable or remove, i prefer rendering badges via api
 			if data.Latest != "" {
 				latestVersion, latestVersionFound := data.Versions[data.Latest]
 				if latestVersionFound {
@@ -393,6 +396,7 @@ func writeDependencyIndexToFilesystem(outputDir string, data map[string]*model.D
 					}
 				}
 			}
+			*/
 		}(current)
 	}
 	wmg.Wait()

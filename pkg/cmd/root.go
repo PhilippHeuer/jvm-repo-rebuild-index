@@ -12,8 +12,7 @@ var cfg zerologconfig.LogConfig
 
 func rootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   `jvm-repo-rebuild-index`,
-		Short: `jvm-repo-rebuild-index aims to provide a machine-readable index for the jvm-repo-rebuild project.`,
+		Use: `jvm-repo-rebuild-index`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			zerologconfig.Configure(cfg)
 		},

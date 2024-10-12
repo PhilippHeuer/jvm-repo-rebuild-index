@@ -89,3 +89,10 @@ func Ternary[T any](condition bool, trueVal T, falseVal T) T {
 	}
 	return falseVal
 }
+
+func TrimURLProtocolAndTrailingSlash(url string) string {
+	url = strings.TrimPrefix(url, "http://")
+	url = strings.TrimPrefix(url, "https://")
+	url = strings.TrimRight(url, "/")
+	return url
+}

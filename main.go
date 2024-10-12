@@ -3,7 +3,7 @@ package main
 import (
 	"log/slog"
 
-	"github.com/philippheuer/reproducible-central-index/pkg/cmd"
+	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/cmd"
 )
 
 var (
