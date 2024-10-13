@@ -26,8 +26,8 @@ var (
 )
 
 type DependencyLookupService interface {
-	LookupProject(repository, coordinate string) (*model.DependencyMetadata, error)
-	LookupDependency(repository, coordinate string) (*model.DependencyMetadata, error)
+	LookupProject(repository, coordinate string) (*model.Dependency, error)
+	LookupDependency(repository, coordinate string) (*model.Dependency, error)
 }
 
 type dependencyLookupService struct {
@@ -42,15 +42,15 @@ func NewDependencyLookupService(localDir, remoteURL string) DependencyLookupServ
 	}
 }
 
-func (s *dependencyLookupService) LookupProject(registryName, coordinate string) (*model.DependencyMetadata, error) {
+func (s *dependencyLookupService) LookupProject(registryName, coordinate string) (*model.Dependency, error) {
 	return s.lookup(registryName, coordinate, "project")
 }
 
-func (s *dependencyLookupService) LookupDependency(registryName, coordinate string) (*model.DependencyMetadata, error) {
+func (s *dependencyLookupService) LookupDependency(registryName, coordinate string) (*model.Dependency, error) {
 	return s.lookup(registryName, coordinate, "maven")
 }
 
-func (s *dependencyLookupService) lookup(registryName, coordinate, variant string) (*model.DependencyMetadata, error) {
+func (s *dependencyLookupService) lookup(registryName, coordinate, variant string) (*model.Dependency, error) {
 	if !slices.Contains(registryNames, registryName) {
 		registryName = util.TrimURLProtocolAndTrailingSlash(registryName)
 
@@ -64,7 +64,7 @@ func (s *dependencyLookupService) lookup(registryName, coordinate, variant strin
 
 	// lookup via local filesystem
 	if s.LocalDir != "" {
-		data, err := util.LoadFromDisk[model.DependencyMetadata](fmt.Sprintf("%s/%s/%s/%s/index.json", s.LocalDir, registryName, variant, util.CoordinateToPath(coordinate, true)))
+		data, err := util.LoadFromDisk[model.Dependency](fmt.Sprintf("%s/%s/%s/%s/index.json", s.LocalDir, registryName, variant, util.CoordinateToPath(coordinate, true)))
 		if err != nil {
 			return nil, errors.Join(ErrDependencyNotFound, err)
 		}
@@ -74,7 +74,7 @@ func (s *dependencyLookupService) lookup(registryName, coordinate, variant strin
 
 	// lookup via remote url
 	if s.RemoteURL != "" {
-		data, err := util.LoadFromURL[model.DependencyMetadata](fmt.Sprintf("%s/%s/%s/%s/index.json", s.RemoteURL, registryName, variant, util.CoordinateToPath(coordinate, true)))
+		data, err := util.LoadFromURL[model.Dependency](fmt.Sprintf("%s/%s/%s/%s/index.json", s.RemoteURL, registryName, variant, util.CoordinateToPath(coordinate, true)))
 		if err != nil {
 			return nil, errors.Join(ErrDependencyNotFound, err)
 		}

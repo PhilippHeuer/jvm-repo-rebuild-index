@@ -64,9 +64,9 @@ func indexCmd() *cobra.Command {
 	return cmd
 }
 
-func processFiles(files []string) (map[string]*model.DependencyMetadata, map[string]*model.ProjectMetadata) {
-	depMetadata := make(map[string]*model.DependencyMetadata)
-	projectMetadata := make(map[string]*model.ProjectMetadata)
+func processFiles(files []string) (map[string]*model.Dependency, map[string]*model.Project) {
+	depMetadata := make(map[string]*model.Dependency)
+	projectMetadata := make(map[string]*model.Project)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	sem := make(chan struct{}, MaxConcurrency) // semaphore to limit concurrency
@@ -104,9 +104,9 @@ func processFiles(files []string) (map[string]*model.DependencyMetadata, map[str
 	return depMetadata, projectMetadata
 }
 
-func processFile(mvnMetadataFile string) (map[string]*model.DependencyMetadata, map[string]*model.ProjectMetadata, error) {
-	result := make(map[string]*model.DependencyMetadata)     // individual artifact metadata
-	projectResult := make(map[string]*model.ProjectMetadata) // project metadata
+func processFile(mvnMetadataFile string) (map[string]*model.Dependency, map[string]*model.Project, error) {
+	result := make(map[string]*model.Dependency)     // individual artifact metadata
+	projectResult := make(map[string]*model.Project) // project metadata
 
 	dir := filepath.Dir(mvnMetadataFile)
 	slog.Debug("found project", "path", mvnMetadataFile, "dir", filepath.Dir(mvnMetadataFile))
@@ -148,7 +148,7 @@ func processFile(mvnMetadataFile string) (map[string]*model.DependencyMetadata, 
 		projectArtifactId := buildInfo["artifact-id"]
 		version := buildCompare["version"]
 
-		versionData := model.VersionMetadata{
+		versionData := model.Version{
 			Project:          buildInfo["name"],
 			SCMUri:           buildInfo["source.scm.uri"],
 			SCMTag:           buildInfo["source.scm.tag"],
@@ -156,8 +156,9 @@ func processFile(mvnMetadataFile string) (map[string]*model.DependencyMetadata, 
 			BuildJavaVersion: buildInfo["java.version"],
 			BuildOSName:      buildInfo["os.name"],
 			Reproducible:     buildCompare["ko"] == "0" && buildCompare["ok"] != "0",
+			FileStats:        model.FileStats{},
 		}
-		allArtifacts := make(map[string]model.Artifact)
+		allArtifacts := make(map[string]model.File)
 		var allCoordinates []string
 
 		var reproducibleFiles []string
@@ -173,7 +174,7 @@ func processFile(mvnMetadataFile string) (map[string]*model.DependencyMetadata, 
 			}
 
 			vd := versionData
-			vd.Artifacts = make(map[string]model.Artifact)
+			vd.Files = make(map[string]model.File)
 			keyPrefix := strings.TrimSuffix(key, ".coordinates")
 			slog.Debug("found artifact", "key", key, "coordinate", coordinate)
 
@@ -197,23 +198,23 @@ func processFile(mvnMetadataFile string) (map[string]*model.DependencyMetadata, 
 				// only add artifacts that match the artifactId
 				if strings.HasPrefix(filename, artifactId+"-"+version) {
 					reproducible := slices.Contains(reproducibleFiles, filename)
-					vd.Artifacts[filename] = model.Artifact{
+					vd.Files[filename] = model.File{
 						Size:         size,
 						Checksum:     checksum,
 						Reproducible: reproducible,
 					}
-					allArtifacts[filename] = vd.Artifacts[filename]
+					allArtifacts[filename] = vd.Files[filename]
 				}
 			}
-			vd.SetReproducibleFilesByArtifacts()
+			vd.SetModuleFileStats()
 
 			// create or append to result
 			if _, ok := result[coordinate]; !ok {
-				result[coordinate] = &model.DependencyMetadata{
-					ReproducibleOverviewURL: overviewUrl,
-					GroupID:                 groupId,
-					ArtifactID:              artifactId,
-					Versions:                map[string]*model.VersionMetadata{version: &vd},
+				result[coordinate] = &model.Dependency{
+					RebuildProjectUrl: overviewUrl,
+					GroupID:           groupId,
+					ArtifactID:        artifactId,
+					Versions:          map[string]*model.Version{version: &vd},
 				}
 				allCoordinates = append(allCoordinates, coordinate)
 			} else {
@@ -227,20 +228,21 @@ func processFile(mvnMetadataFile string) (map[string]*model.DependencyMetadata, 
 				continue
 			}
 
-			result[rk].Versions[version].SetProjectReproducibleFilesByArtifacts(allArtifacts)
+			result[rk].Versions[version].SetTotalFileStats(allArtifacts)
 		}
 
 		// append project metadata
-		versionData.Artifacts = allArtifacts
-		versionData.SetReproducibleFilesByArtifacts()
+		versionData.Files = allArtifacts
+		versionData.SetTotalFileStats(allArtifacts)
+		versionData.SetModuleFileStats()
 		projectKey := projectGroupId + ":" + projectArtifactId
 		if _, ok := projectResult[projectKey]; !ok {
-			projectResult[projectKey] = &model.ProjectMetadata{
-				ReproducibleOverviewURL: overviewUrl,
-				GroupID:                 projectGroupId,
-				ArtifactID:              projectArtifactId,
-				Modules:                 allCoordinates,
-				Versions:                map[string]*model.VersionMetadata{version: &versionData},
+			projectResult[projectKey] = &model.Project{
+				RebuildProjectUrl: overviewUrl,
+				GroupID:           projectGroupId,
+				ArtifactID:        projectArtifactId,
+				Modules:           allCoordinates,
+				Versions:          map[string]*model.Version{version: &versionData},
 			}
 		} else {
 			projectResult[projectKey].Versions[version] = &versionData
@@ -284,7 +286,7 @@ func processFile(mvnMetadataFile string) (map[string]*model.DependencyMetadata, 
 	return result, projectResult, nil
 }
 
-func writeProjectIndexToFilesystem(outputDir string, data map[string]*model.ProjectMetadata) {
+func writeProjectIndexToFilesystem(outputDir string, data map[string]*model.Project) {
 	var wmg sync.WaitGroup
 	sem := make(chan struct{}, MaxConcurrency) // semaphore to limit concurrency
 	for _, v := range data {
@@ -292,7 +294,7 @@ func writeProjectIndexToFilesystem(outputDir string, data map[string]*model.Proj
 		wmg.Add(1)
 		sem <- struct{}{} // acquire semaphore
 
-		go func(data *model.ProjectMetadata) {
+		go func(data *model.Project) {
 			defer wmg.Done()
 			defer func() {
 				<-sem // release semaphore
@@ -343,7 +345,7 @@ func writeProjectIndexToFilesystem(outputDir string, data map[string]*model.Proj
 	wmg.Wait()
 }
 
-func writeDependencyIndexToFilesystem(outputDir string, data map[string]*model.DependencyMetadata) {
+func writeDependencyIndexToFilesystem(outputDir string, data map[string]*model.Dependency) {
 	var wmg sync.WaitGroup
 	sem := make(chan struct{}, MaxConcurrency) // semaphore to limit concurrency
 	for _, v := range data {
@@ -351,7 +353,7 @@ func writeDependencyIndexToFilesystem(outputDir string, data map[string]*model.D
 		wmg.Add(1)
 		sem <- struct{}{} // acquire semaphore
 
-		go func(data *model.DependencyMetadata) {
+		go func(data *model.Dependency) {
 			defer wmg.Done()
 			defer func() {
 				<-sem // release semaphore

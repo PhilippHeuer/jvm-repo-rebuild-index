@@ -5,6 +5,10 @@ name: publish-index
 on:
   # allow manual triggering
   workflow_dispatch:
+  # run on pushes to main
+  push:
+    branches:
+      - main
   # run every 6 hours
   schedule:
     - cron: "0 */6 * * *"

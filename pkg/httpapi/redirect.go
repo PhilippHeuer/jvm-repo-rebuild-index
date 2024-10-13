@@ -37,5 +37,5 @@ func (h handlers) redirectHandler(c echo.Context) error {
 	}
 
 	// redirect
-	return c.Redirect(http.StatusFound, data.ReproducibleOverviewURL)
+	return c.Redirect(http.StatusFound, data.RebuildProjectUrl)
 }

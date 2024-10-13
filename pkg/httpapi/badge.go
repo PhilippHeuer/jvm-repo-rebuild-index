@@ -55,7 +55,7 @@ func (h handlers) projectBadgeHandler(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, badge.NewDependencyBadge(
-		fmt.Sprintf("%s - %d/%d ok", artifactVersion, version.ReproducibleFiles, version.ReproducibleFiles+version.NonReproducibleFiles),
+		fmt.Sprintf("%s - %d/%d ok", artifactVersion, version.FileStats.TotalReproducibleFiles, version.FileStats.TotalReproducibleFiles+version.FileStats.TotalNonReproducibleFiles),
 		util.Ternary(version.Reproducible, badge.Success, badge.Error),
 		theme),
 	)
@@ -66,6 +66,7 @@ func (h handlers) dependencyBadgeHandler(c echo.Context) error {
 	coordinate := c.Param("coordinate")
 	artifactVersion := c.Param("version")
 	theme := c.QueryParam("theme")
+	scope := c.QueryParam("scope") // project or module
 	if registry == "" {
 		registry = "repo.maven.apache.org/maven2" // default to Maven Central
 	}
@@ -74,6 +75,9 @@ func (h handlers) dependencyBadgeHandler(c echo.Context) error {
 	}
 	if artifactVersion == "" {
 		return c.JSON(http.StatusBadRequest, "param version is required")
+	}
+	if scope != "project" && scope != "module" {
+		scope = "project"
 	}
 	if !util.IsValidMavenCoordinate(coordinate) {
 		return c.JSON(http.StatusBadRequest, "query param coordinate is not a valid maven coordinate")
@@ -103,9 +107,17 @@ func (h handlers) dependencyBadgeHandler(c echo.Context) error {
 		return c.JSON(http.StatusOK, badge.NewDependencyBadge("pending verification", badge.Warning, theme))
 	}
 
+	// badge
+	badgeText := fmt.Sprintf("%d/%d ok", version.FileStats.TotalReproducibleFiles, version.FileStats.TotalReproducibleFiles+version.FileStats.TotalNonReproducibleFiles)
+	badgeStatus := util.Ternary(version.FileStats.TotalNonReproducibleFiles == 0, badge.Success, badge.Error)
+	if scope == "module" {
+		badgeText = fmt.Sprintf("%d/%d ok", version.FileStats.ModuleReproducibleFiles, version.FileStats.ModuleReproducibleFiles+version.FileStats.ModuleNonReproducibleFiles)
+		badgeStatus = util.Ternary(version.FileStats.ModuleNonReproducibleFiles == 0, badge.Success, badge.Error)
+	}
+
 	return c.JSON(http.StatusOK, badge.NewDependencyBadge(
-		fmt.Sprintf("%d/%d ok", version.ProjectReproducibleFiles, version.ProjectReproducibleFiles+version.ProjectNonReproducibleFiles),
-		util.Ternary(version.Reproducible, badge.Success, badge.Error),
+		badgeText,
+		badgeStatus,
 		theme),
 	)
 }

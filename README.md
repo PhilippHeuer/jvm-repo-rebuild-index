@@ -66,7 +66,7 @@ You can use the `Endpoint Badge` of shields.io to display the reproducibility st
 
 ### The latest version is missing / not up-to-date
 
-If the version schema of the artifact is not semver compliant, the latest version may be reported falsely as we use a semver comparison to determine the latest version.
+If the version schema of a project is not semver compliant, the latest version may be reported falsely as we use a semver comparison to determine the latest version.
 
 ## License
 
