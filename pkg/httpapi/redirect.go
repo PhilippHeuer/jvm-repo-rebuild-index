@@ -29,7 +29,7 @@ func (h handlers) redirectHandler(c echo.Context) error {
 		if errors.Is(err, service.ErrRepositoryNotFound) {
 			return c.JSON(http.StatusBadRequest, "repository not configured")
 		} else if errors.Is(err, service.ErrDependencyNotFound) {
-			return c.JSON(http.StatusBadRequest, "artifact not configured")
+			return c.Redirect(http.StatusFound, "https://reproducible-builds.org/docs/jvm/") // redirect to documentation
 		}
 
 		slog.Error("Error looking up dependency metadata", "err", err)
