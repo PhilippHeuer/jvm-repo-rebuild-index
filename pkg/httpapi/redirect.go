@@ -32,7 +32,7 @@ func (h handlers) redirectHandler(c echo.Context) error {
 			return c.JSON(http.StatusBadRequest, "artifact not configured")
 		}
 
-		slog.Error("Error looking up dependency metadata: %s", err)
+		slog.Error("Error looking up dependency metadata", "err", err)
 		return c.JSON(http.StatusInternalServerError, "internal server error")
 	}
 

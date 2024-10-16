@@ -25,7 +25,7 @@ func serveCmd() *cobra.Command {
 			// start server
 			err := httpapi.Serve(port, indexDir, indexURL)
 			if err != nil {
-				slog.Error("Error starting server: %s", err)
+				slog.Error("Error starting server", "err", err)
 				os.Exit(1)
 			}
 		},

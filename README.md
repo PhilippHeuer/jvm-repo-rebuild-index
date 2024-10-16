@@ -62,12 +62,6 @@ You can use the `Endpoint Badge` of shields.io to display the reproducibility st
 
 ![Reproducible Builds](https://img.shields.io/endpoint?url=https://jvm-rebuild.philippheuer.de/v1/badge/reproducible/maven/io.github.xanthic.cache:cache-api/latest)
 
-## Known Limitations
-
-### The latest version is missing / not up-to-date
-
-If the version schema of a project is not semver compliant, the latest version may be reported falsely as we use a semver comparison to determine the latest version.
-
 ## License
 
 The code is released under the [MIT license](./LICENSE).

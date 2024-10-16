@@ -2,16 +2,14 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 
-	"github.com/Masterminds/semver/v3"
+	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/jvmrebuild"
 	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/model"
 	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/util"
 	"github.com/spf13/cobra"
@@ -111,6 +109,12 @@ func processFile(mvnMetadataFile string) (map[string]*model.Dependency, map[stri
 	dir := filepath.Dir(mvnMetadataFile)
 	slog.Debug("found project", "path", mvnMetadataFile, "dir", filepath.Dir(mvnMetadataFile))
 
+	// read maven-metadata.xml
+	mvnMetadata, mvnMetadataErr := util.ParseMavenMetadataFile(mvnMetadataFile)
+	if mvnMetadataErr != nil {
+		return nil, nil, errors.Join(errors.New("failed to parse maven-metadata.xml"), mvnMetadataErr)
+	}
+
 	// TODO: this will generate invalid links when using with other repos than reproducible-central
 	contentIndex := strings.Index(dir, "/content")
 	overviewUrl := ""
@@ -128,33 +132,31 @@ func processFile(mvnMetadataFile string) (map[string]*model.Dependency, map[stri
 	for _, buildInfoFile := range buildInfoFiles {
 		slog.Debug("found buildinfo file", "path", buildInfoFile, "dir", filepath.Dir(buildInfoFile))
 
-		buildInfo, buildInfoErr := util.ParseFile(buildInfoFile)
+		buildInfo, buildInfoErr := jvmrebuild.ParseBuildInfo(buildInfoFile)
 		if buildInfoErr != nil {
-			slog.Error("failed to parse buildinfo file", "error", buildInfoErr)
+			slog.Error("failed to parse buildinfo file", "error", buildInfoErr, "file", buildInfoFile)
 			continue
 		}
-		buildCompare, buildCompareErr := util.ParseFile(strings.Replace(buildInfoFile, ".buildinfo", ".buildcompare", 1))
+		if buildInfo.SpecVersion != "" && buildInfo.SpecVersion != "0.1-SNAPSHOT" && buildInfo.SpecVersion != "1.0-SNAPSHOT" {
+			slog.Error("failed to find a supported artifactVersion in buildinfo file", "file", buildInfoFile, "version", buildInfo.SpecVersion)
+			continue
+		}
+
+		buildCompareFile := strings.Replace(buildInfoFile, ".buildinfo", ".buildcompare", 1)
+		buildCompare, buildCompareErr := util.ParseFile(buildCompareFile)
 		if buildCompareErr != nil {
-			slog.Error("failed to parse buildinfo file", "error", buildCompareErr)
+			slog.Error("failed to parse buildinfo file", "error", buildCompareErr, "file", buildCompareFile)
 			continue
 		}
 
-		buildInfoVersion := buildInfo["buildinfo.version"]
-		if buildInfoVersion != "" && buildInfoVersion != "1.0-SNAPSHOT" {
-			slog.Error("failed to find a supported buildinfo.version in buildinfo file", "file", buildInfoFile, "version", buildInfoVersion)
-			continue
-		}
-		projectGroupId := buildInfo["group-id"]
-		projectArtifactId := buildInfo["artifact-id"]
-		version := buildCompare["version"]
-
+		artifactVersion := buildCompare["version"] // buildInfo.Version is not always present, prefer buildCompare
 		versionData := model.Version{
-			Project:          buildInfo["name"],
-			SCMUri:           buildInfo["source.scm.uri"],
-			SCMTag:           buildInfo["source.scm.tag"],
-			BuildTool:        buildInfo["build-tool"],
-			BuildJavaVersion: buildInfo["java.version"],
-			BuildOSName:      buildInfo["os.name"],
+			Project:          buildInfo.Name,
+			SCMUri:           buildInfo.SourceSCMUri,
+			SCMTag:           buildInfo.SourceSCMTag,
+			BuildTool:        buildInfo.BuildTool,
+			BuildJavaVersion: buildInfo.JavaVersion,
+			BuildOSName:      buildInfo.OSName,
 			Reproducible:     buildCompare["ko"] == "0" && buildCompare["ok"] != "0",
 			FileStats:        model.FileStats{},
 		}
@@ -165,121 +167,74 @@ func processFile(mvnMetadataFile string) (map[string]*model.Dependency, map[stri
 		if rf, ok := buildCompare["okFiles"]; ok {
 			reproducibleFiles = strings.Split(rf, " ")
 		}
-		slog.Debug("parsed buildinfo and buildcompare file", "file", buildInfoFile, "version", version)
+		slog.Debug("parsed buildinfo and buildcompare file", "file", buildInfoFile, "version", artifactVersion)
 
 		// iterate over all outputs (look for key matching e.g. outputs.3.coordinates in buildInfo)
-		for key, coordinate := range buildInfo {
-			if !strings.HasPrefix(key, "outputs.") || !strings.HasSuffix(key, ".coordinates") {
-				continue // skip, if key is not a coordinate key
-			}
-
+		for _, output := range buildInfo.Outputs {
 			vd := versionData
 			vd.Files = make(map[string]model.File)
-			keyPrefix := strings.TrimSuffix(key, ".coordinates")
-			slog.Debug("found artifact", "key", key, "coordinate", coordinate)
+			slog.Debug("found artifact", "coordinate", output.Coordinate)
 
-			groupId := strings.SplitN(coordinate, ":", 2)[0]
-			artifactId := strings.SplitN(coordinate, ":", 2)[1]
+			groupId := strings.SplitN(output.Coordinate, ":", 2)[0]
+			artifactId := strings.SplitN(output.Coordinate, ":", 2)[1]
 			if groupId == "" || artifactId == "" {
-				slog.Warn("no group-id or artifact-id found for version", "version", version, "coordinate", coordinate)
+				slog.Warn("no group-id or artifact-id found for version", "version", artifactVersion, "coordinate", output.Coordinate)
 				continue
 			}
 
-			for i := 0; ; i++ {
-				filename, filenameOk := buildInfo[fmt.Sprintf("%s.%d.filename", keyPrefix, i)]
-				size, sizeOK := buildInfo[fmt.Sprintf("%s.%d.length", keyPrefix, i)]
-				checksum, checksumOk := buildInfo[fmt.Sprintf("%s.%d.checksums.sha512", keyPrefix, i)]
-
-				// stop, if information is missing
-				if !filenameOk || !sizeOK || !checksumOk {
-					break
-				}
-
-				// only add artifacts that match the artifactId
-				if strings.HasPrefix(filename, artifactId+"-"+version) {
-					reproducible := slices.Contains(reproducibleFiles, filename)
-					vd.Files[filename] = model.File{
-						Size:         size,
-						Checksum:     checksum,
+			for name, file := range output.Files {
+				if strings.HasPrefix(name, artifactId+"-"+artifactVersion) {
+					reproducible := slices.Contains(reproducibleFiles, name)
+					vd.Files[name] = model.File{
+						Size:         file.Size,
+						Checksum:     file.Checksum,
 						Reproducible: reproducible,
 					}
-					allArtifacts[filename] = vd.Files[filename]
+					allArtifacts[name] = vd.Files[name]
 				}
 			}
 			vd.SetModuleFileStats()
 
 			// create or append to result
-			if _, ok := result[coordinate]; !ok {
-				result[coordinate] = &model.Dependency{
+			if _, ok := result[output.Coordinate]; !ok {
+				result[output.Coordinate] = &model.Dependency{
 					RebuildProjectUrl: overviewUrl,
 					GroupID:           groupId,
 					ArtifactID:        artifactId,
-					Versions:          map[string]*model.Version{version: &vd},
+					Versions:          map[string]*model.Version{artifactVersion: &vd},
+					Latest:            mvnMetadata.Versioning.Latest,
 				}
-				allCoordinates = append(allCoordinates, coordinate)
+				allCoordinates = append(allCoordinates, output.Coordinate)
 			} else {
-				result[coordinate].Versions[version] = &vd
+				result[output.Coordinate].Versions[artifactVersion] = &vd
 			}
 		}
 
 		// set reproducible file count for the entire project
 		for rk := range result {
-			if result[rk].Versions[version] == nil {
+			if result[rk].Versions[artifactVersion] == nil {
 				continue
 			}
 
-			result[rk].Versions[version].SetTotalFileStats(allArtifacts)
+			result[rk].Versions[artifactVersion].SetTotalFileStats(allArtifacts)
 		}
 
 		// append project metadata
 		versionData.Files = allArtifacts
 		versionData.SetTotalFileStats(allArtifacts)
 		versionData.SetModuleFileStats()
-		projectKey := projectGroupId + ":" + projectArtifactId
+		projectKey := buildInfo.GroupID + ":" + buildInfo.ArtifactID
 		if _, ok := projectResult[projectKey]; !ok {
 			projectResult[projectKey] = &model.Project{
 				RebuildProjectUrl: overviewUrl,
-				GroupID:           projectGroupId,
-				ArtifactID:        projectArtifactId,
+				GroupID:           buildInfo.GroupID,
+				ArtifactID:        buildInfo.ArtifactID,
 				Modules:           allCoordinates,
-				Versions:          map[string]*model.Version{version: &versionData},
+				Versions:          map[string]*model.Version{artifactVersion: &versionData},
+				Latest:            mvnMetadata.Versioning.Latest,
 			}
 		} else {
-			projectResult[projectKey].Versions[version] = &versionData
-		}
-	}
-
-	// set latest version
-	for k, v := range result {
-		var versions []*semver.Version
-		for ver := range v.Versions {
-			version, err := semver.NewVersion(ver)
-			if err != nil {
-				slog.Error("failed to parse version", "version", ver, "error", err)
-				continue
-			}
-			versions = append(versions, version)
-		}
-		if len(versions) > 0 {
-			sort.Sort(semver.Collection(versions))
-			latestVersion := versions[len(versions)-1].String()
-			result[k].Latest = latestVersion
-		}
-	}
-	for k, v := range projectResult {
-		var versions []*semver.Version
-		for ver := range v.Versions {
-			version, err := semver.NewVersion(ver)
-			if err != nil {
-				slog.Error("failed to parse version", "version", ver, "error", err)
-				continue
-			}
-			versions = append(versions, version)
-		}
-		if len(versions) > 0 {
-			sort.Sort(semver.Collection(versions))
-			latestVersion := versions[len(versions)-1].String()
-			projectResult[k].Latest = latestVersion
+			projectResult[projectKey].Versions[artifactVersion] = &versionData
 		}
 	}
 

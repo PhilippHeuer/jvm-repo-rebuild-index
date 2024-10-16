@@ -1,11 +1,11 @@
 module github.com/philippheuer/jvm-repo-rebuild-index
 
-go 1.22.1
+go 1.23.2
 
 require (
-	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/charlievieth/fastwalk v1.0.8
 	github.com/cidverse/cidverseutils/zerologconfig v0.1.0
+	github.com/google/go-cmp v0.6.0
 	github.com/labstack/echo/v4 v4.12.0
 	github.com/spf13/cobra v1.8.1
 )

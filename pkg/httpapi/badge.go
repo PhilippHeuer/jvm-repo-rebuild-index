@@ -39,7 +39,7 @@ func (h handlers) projectBadgeHandler(c echo.Context) error {
 			return c.JSON(http.StatusOK, badge.NewDependencyBadge("not configured", badge.Error, theme))
 		}
 
-		slog.Error("Error looking up dependency metadata: %s", err)
+		slog.Error("Error looking up dependency metadata", "err", err)
 		return c.JSON(http.StatusInternalServerError, "internal server error")
 	}
 
@@ -92,7 +92,7 @@ func (h handlers) dependencyBadgeHandler(c echo.Context) error {
 			return c.JSON(http.StatusOK, badge.NewDependencyBadge("not configured", badge.Error, theme))
 		}
 
-		slog.Error("Error looking up dependency metadata: %s", err)
+		slog.Error("Error looking up dependency metadata", "err", err)
 		return c.JSON(http.StatusInternalServerError, "internal server error")
 	}
 
