@@ -48,7 +48,7 @@ func (h handlers) projectBadgeHandler(c echo.Context) error {
 	// lookup
 	data, err := h.lookupService.LookupProject(registry, gav)
 	if err != nil {
-		if errors.Is(err, service.ErrRepositoryNotFound) {
+		if errors.Is(err, service.ErrRegistryNotFound) {
 			return c.JSON(http.StatusOK, badge.NewDependencyBadge("repository not configured", badge.Error, theme))
 		} else if errors.Is(err, service.ErrDependencyNotFound) {
 			return c.JSON(http.StatusOK, badge.NewDependencyBadge("not configured", badge.Error, theme))
@@ -112,7 +112,7 @@ func (h handlers) dependencyBadgeHandler(c echo.Context) error {
 	// lookup
 	data, err := h.lookupService.LookupDependency(registry, gav)
 	if err != nil {
-		if errors.Is(err, service.ErrRepositoryNotFound) {
+		if errors.Is(err, service.ErrRegistryNotFound) {
 			return c.JSON(http.StatusOK, badge.NewDependencyBadge("repository not configured", badge.Error, theme))
 		} else if errors.Is(err, service.ErrDependencyNotFound) {
 			return c.JSON(http.StatusOK, badge.NewDependencyBadge("not configured", badge.Error, theme))

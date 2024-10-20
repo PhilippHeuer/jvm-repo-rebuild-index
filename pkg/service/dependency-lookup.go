@@ -4,25 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 
 	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/model"
 	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/util"
 )
 
-var registryNames = []string{
-	"mavencentral",
-	"gradlepluginportal",
-}
-
 var registryToNameMap = map[string]string{
-	"repo.maven.apache.org/maven2": "mavencentral",
 	"repo1.maven.org/maven2":       "mavencentral",
+	"repo.maven.apache.org/maven2": "mavencentral",
 	"plugins.gradle.org/m2":        "gradlepluginportal",
 }
 
+var registryNames = slices.Collect(maps.Values(registryToNameMap))
+
 var (
-	ErrRepositoryNotFound = errors.New("repository is not supported")
+	ErrRegistryNotFound   = errors.New("registry is not supported")
 	ErrDependencyNotFound = errors.New("dependency not found")
 )
 
@@ -66,7 +64,6 @@ func (s *dependencyLookupService) FetchPom(registry string, coordinate model.GAV
 }
 
 func (s *dependencyLookupService) CollectCoordinates(registry string, coordinate model.GAV) ([]model.GAV, error) {
-	// collect coordinates
 	var coordinates []model.GAV
 	coordinates = append(coordinates, coordinate)
 
@@ -88,9 +85,9 @@ func (s *dependencyLookupService) CollectCoordinates(registry string, coordinate
 }
 
 func (s *dependencyLookupService) lookup(registry string, coordinate model.GAV, variant string) (*model.Dependency, error) {
-	registry, err := toRegistryName(registry)
-	if err != nil {
-		return nil, err
+	registry, rErr := toRegistryName(registry)
+	if rErr != nil {
+		return nil, rErr
 	}
 
 	// lookup via local filesystem
@@ -117,9 +114,9 @@ func (s *dependencyLookupService) lookup(registry string, coordinate model.GAV, 
 }
 
 func (s *dependencyLookupService) LookupDependencyVersion(registry string, coordinate model.GAV) (*model.Version, error) {
-	registry, err := toRegistryName(registry)
-	if err != nil {
-		return nil, err
+	registry, rErr := toRegistryName(registry)
+	if rErr != nil {
+		return nil, rErr
 	}
 
 	// lookup via local filesystem
@@ -151,7 +148,7 @@ func toRegistryName(registryName string) (string, error) {
 
 		newName, ok := registryToNameMap[registryName]
 		if !ok {
-			return "", ErrRepositoryNotFound
+			return "", ErrRegistryNotFound
 		}
 
 		registryName = newName

@@ -1,7 +1,8 @@
 openapi: 3.0.3
 info:
   title: JVM-Rebuild API
-  description: JVM-Rebuild API
+  description: |
+    JVM-Rebuild API
   version: 1.0.0
 
 servers:
@@ -100,9 +101,10 @@ components:
       required: false
       schema:
         type: string
-        example: "renovate"
+        example: "default"
         enum:
           - default
+          - dependabot
           - renovate
   responses:
     ShieldsIOEndpointBadge:

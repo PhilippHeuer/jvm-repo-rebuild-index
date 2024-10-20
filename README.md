@@ -46,7 +46,9 @@ https://philippheuer.github.io/jvm-repo-rebuild-index/mavencentral/maven/io/gith
 
 ## Badges
 
-You can use the `Endpoint Badge` of shields.io to display the reproducibility status of the latest release:
+You can use the `Endpoint Badge` of shields.io to display the reproducibility status of a project, artifact or dependencies.
+
+### Project Badge
 
 ```markdown
 # project - io.github.xanthic.cache:cache-api (all artifacts)
@@ -55,12 +57,27 @@ You can use the `Endpoint Badge` of shields.io to display the reproducibility st
 
 ![Reproducible Builds](https://img.shields.io/endpoint?url=https://jvm-rebuild.philippheuer.de/v1/badge/reproducible/project/io.github.xanthic.cache:cache-api/latest)
 
+### Artifact Badge
+
 ```markdown
 # artifact - io.github.xanthic.cache:cache-provider-caffeine3
 ![Reproducible Builds](https://img.shields.io/endpoint?url=https://jvm-rebuild.philippheuer.de/v1/badge/reproducible/maven/io.github.xanthic.cache:cache-api/latest)
 ```
 
 ![Reproducible Builds](https://img.shields.io/endpoint?url=https://jvm-rebuild.philippheuer.de/v1/badge/reproducible/maven/io.github.xanthic.cache:cache-api/latest)
+
+### Dependency Badge (Experimental)
+
+The dependency badge counts all dependencies of a library that are reproducible.
+
+**Note**: This badge is experimental and could break at any time, as it's using unofficial endpoints.
+
+```markdown
+# artifact - io.github.xanthic.cache:cache-provider-caffeine3
+![Reproducible Builds](https://img.shields.io/endpoint?url=https://jvm-rebuild.philippheuer.de/v1/badge/reproducible-dependencies/maven/io.github.xanthic.cache:cache-provider-cache2k/0.6.2)
+```
+
+![Reproducible Builds](https://img.shields.io/endpoint?url=https://jvm-rebuild.philippheuer.de/v1/badge/reproducible-dependencies/maven/io.github.xanthic.cache:cache-provider-cache2k/0.6.2)
 
 ## License
 

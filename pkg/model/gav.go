@@ -4,8 +4,6 @@ import (
 	"errors"
 	"strings"
 	"unicode"
-
-	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/util"
 )
 
 type GAV struct {
@@ -22,45 +20,50 @@ func (gav *GAV) Coordinate() string {
 }
 
 func (gav *GAV) Path(trimVersion bool) string {
-	return util.CoordinateToPath(gav.Coordinate(), trimVersion)
+	groupAndArtifact := strings.NewReplacer(".", "/", ":", "/").Replace(gav.GroupId + ":" + gav.ArtifactId)
+
+	if trimVersion || gav.Version == "" {
+		return groupAndArtifact
+	}
+	return groupAndArtifact + "/" + gav.Version
 }
 
 // NewGAV creates a new GAV (groupId, artifactId, version) struct from a Maven coordinate
 func NewGAV(coordinate string) (GAV, error) {
-	if !IsValidMavenCoordinate(coordinate) {
+	return parseMavenCoordinate(coordinate)
+}
+
+func NewGAVIgnoreError(coordinate string) GAV {
+	gav, err := parseMavenCoordinate(coordinate)
+	if err != nil {
+		return GAV{}
+	}
+	return gav
+}
+
+// parseMavenCoordinate is a helper function that parses Maven coordinates into a struct
+func parseMavenCoordinate(coordinate string) (GAV, error) {
+	if !isValidMavenCoordinate(coordinate) {
 		return GAV{}, errors.New("invalid Maven coordinate: contains illegal characters")
 	}
 
 	parts := strings.Split(coordinate, ":")
-	if len(parts) != 3 {
-		return GAV{}, errors.New("invalid Maven coordinate: expected format is 'groupId:artifactId:version'")
+	if len(parts) < 2 || len(parts) > 3 {
+		return GAV{}, errors.New("invalid Maven coordinate: expected format is 'groupId:artifactId' or 'groupId:artifactId:version'")
 	}
 
-	return GAV{
+	gav := GAV{
 		GroupId:    parts[0],
 		ArtifactId: parts[1],
-		Version:    parts[2],
-	}, nil
-}
-
-// NewGA creates a new GAV (groupId, artifactId) struct from a Maven coordinate
-func NewGA(coordinate string) (GAV, error) {
-	if !IsValidMavenCoordinate(coordinate) {
-		return GAV{}, errors.New("invalid Maven coordinate: contains illegal characters")
+	}
+	if len(parts) == 3 {
+		gav.Version = parts[2]
 	}
 
-	parts := strings.Split(coordinate, ":")
-	if len(parts) != 2 {
-		return GAV{}, errors.New("invalid Maven coordinate: expected format is 'groupId:artifactId'")
-	}
-
-	return GAV{
-		GroupId:    parts[0],
-		ArtifactId: parts[1],
-	}, nil
+	return gav, nil
 }
 
-func IsValidMavenCoordinate(coordinate string) bool {
+func isValidMavenCoordinate(coordinate string) bool {
 	for _, ch := range coordinate {
 		if !unicode.IsLetter(ch) && !unicode.IsDigit(ch) && ch != '.' && ch != ':' && ch != '-' {
 			return false

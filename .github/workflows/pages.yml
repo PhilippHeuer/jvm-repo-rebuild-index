@@ -32,7 +32,7 @@ jobs:
           path: "index"
           retention-days: 1
 
-  # deploy generated index files to github pages
+  # deploy generated index files to GitHub pages
   deploy:
     permissions:
       contents: read

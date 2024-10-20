@@ -19,7 +19,7 @@ func (h handlers) redirectHandler(c echo.Context) error {
 	if coordinate == "" {
 		return c.JSON(http.StatusBadRequest, "query param coordinate is required")
 	}
-	gav, err := model.NewGA(coordinate)
+	gav, err := model.NewGAV(coordinate)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, "invalid maven coordinate")
 	}
@@ -27,7 +27,7 @@ func (h handlers) redirectHandler(c echo.Context) error {
 	// lookup
 	data, err := h.lookupService.LookupDependency(registry, gav)
 	if err != nil {
-		if errors.Is(err, service.ErrRepositoryNotFound) {
+		if errors.Is(err, service.ErrRegistryNotFound) {
 			return c.JSON(http.StatusBadRequest, "repository not configured")
 		} else if errors.Is(err, service.ErrDependencyNotFound) {
 			return c.Redirect(http.StatusFound, "https://reproducible-builds.org/docs/jvm/") // redirect to documentation

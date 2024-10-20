@@ -88,7 +88,7 @@ func TestParseBuildInfo(t *testing.T) {
 				t.Fatalf("Failed to get absolute path: %v", err)
 			}
 
-			if _, err := os.Stat(path); os.IsNotExist(err) {
+			if _, err = os.Stat(path); os.IsNotExist(err) {
 				t.Fatalf("Test file not found: %s", path)
 			}
 
