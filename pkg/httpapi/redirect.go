@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/model"
 	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/service"
-	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/util"
 )
 
 func (h handlers) redirectHandler(c echo.Context) error {
@@ -19,12 +19,13 @@ func (h handlers) redirectHandler(c echo.Context) error {
 	if coordinate == "" {
 		return c.JSON(http.StatusBadRequest, "query param coordinate is required")
 	}
-	if !util.IsValidMavenCoordinate(coordinate) {
-		return c.JSON(http.StatusBadRequest, "query param coordinate is not a valid maven coordinate")
+	gav, err := model.NewGA(coordinate)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "invalid maven coordinate")
 	}
 
 	// lookup
-	data, err := h.lookupService.LookupDependency(registry, coordinate)
+	data, err := h.lookupService.LookupDependency(registry, gav)
 	if err != nil {
 		if errors.Is(err, service.ErrRepositoryNotFound) {
 			return c.JSON(http.StatusBadRequest, "repository not configured")

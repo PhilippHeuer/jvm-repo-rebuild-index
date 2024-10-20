@@ -24,7 +24,7 @@ func Serve(port int, indexDir string, indexURL string) error {
 
 	// middlewares
 	e.Use(middleware.Recover())
-	// e.Use(middleware.Logger())
+	e.Use(middleware.CORS())
 
 	// services
 	handlerStruct := handlers{
@@ -35,10 +35,16 @@ func Serve(port int, indexDir string, indexURL string) error {
 	e.GET("/health", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, "OK")
 	})
+
 	e.GET("/v1/badge/reproducible/maven/:coordinate/:version", handlerStruct.dependencyBadgeHandler)
 	e.GET("/v1/badge/reproducible/maven/:registry/:coordinate/:version", handlerStruct.dependencyBadgeHandler)
+
+	e.GET("/v1/badge/reproducible-dependencies/maven/:registry/:coordinate/:version", handlerStruct.transitiveDependencyBadgeHandler)
+	e.GET("/v1/badge/reproducible-dependencies/maven/:coordinate/:version", handlerStruct.transitiveDependencyBadgeHandler)
+
 	e.GET("/v1/badge/reproducible/project/:coordinate/:version", handlerStruct.projectBadgeHandler)
 	e.GET("/v1/badge/reproducible/project/:registry/:coordinate/:version", handlerStruct.projectBadgeHandler)
+
 	e.GET("/v1/redirect/reproducible/maven/:coordinate/:version", handlerStruct.redirectHandler)
 	e.GET("/v1/redirect/reproducible/maven/:registry/:coordinate/:version", handlerStruct.redirectHandler)
 

@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/labstack/echo/v4"
 	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/badge"
+	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/model"
 	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/service"
+	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/sonatype"
 	"github.com/philippheuer/jvm-repo-rebuild-index/pkg/util"
 )
 
@@ -26,12 +29,13 @@ func (h handlers) projectBadgeHandler(c echo.Context) error {
 	if artifactVersion == "" {
 		return c.JSON(http.StatusBadRequest, "param version is required")
 	}
-	if !util.IsValidMavenCoordinate(coordinate) {
-		return c.JSON(http.StatusBadRequest, "query param coordinate is not a valid maven coordinate")
+	gav, err := model.NewGAV(coordinate + ":" + artifactVersion)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "invalid maven coordinate")
 	}
 
 	// lookup
-	data, err := h.lookupService.LookupProject(registry, coordinate)
+	data, err := h.lookupService.LookupProject(registry, gav)
 	if err != nil {
 		if errors.Is(err, service.ErrRepositoryNotFound) {
 			return c.JSON(http.StatusOK, badge.NewDependencyBadge("repository not configured", badge.Error, theme))
@@ -79,12 +83,13 @@ func (h handlers) dependencyBadgeHandler(c echo.Context) error {
 	if scope != "project" && scope != "module" {
 		scope = "project"
 	}
-	if !util.IsValidMavenCoordinate(coordinate) {
-		return c.JSON(http.StatusBadRequest, "query param coordinate is not a valid maven coordinate")
+	gav, err := model.NewGAV(coordinate + ":" + artifactVersion)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "invalid maven coordinate")
 	}
 
 	// lookup
-	data, err := h.lookupService.LookupDependency(registry, coordinate)
+	data, err := h.lookupService.LookupDependency(registry, gav)
 	if err != nil {
 		if errors.Is(err, service.ErrRepositoryNotFound) {
 			return c.JSON(http.StatusOK, badge.NewDependencyBadge("repository not configured", badge.Error, theme))
@@ -115,6 +120,71 @@ func (h handlers) dependencyBadgeHandler(c echo.Context) error {
 		badgeStatus = util.Ternary(version.FileStats.ModuleNonReproducibleFiles == 0, badge.Success, badge.Error)
 	}
 
+	return c.JSON(http.StatusOK, badge.NewDependencyBadge(
+		badgeText,
+		badgeStatus,
+		theme),
+	)
+}
+
+func (h handlers) transitiveDependencyBadgeHandler(c echo.Context) error {
+	registry := c.Param("registry")
+	coordinate := c.Param("coordinate")
+	artifactVersion := c.Param("version")
+	theme := c.QueryParam("theme")
+	if registry == "" {
+		registry = "repo.maven.apache.org/maven2" // default to Maven Central
+	}
+	if coordinate == "" {
+		return c.JSON(http.StatusBadRequest, "param coordinate is required")
+	}
+	if artifactVersion == "" {
+		return c.JSON(http.StatusBadRequest, "param version is required")
+	}
+	gav, err := model.NewGAV(coordinate + ":" + artifactVersion)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "invalid maven coordinate")
+	}
+
+	// collect coordinates (includes special handling for BOMs)
+	coordinates, err := h.lookupService.CollectCoordinates(registry, gav)
+	if err != nil {
+		slog.Error("Error collecting coordinates", "err", err)
+		return c.JSON(http.StatusInternalServerError, "internal server error")
+	}
+
+	// lookup transitive dependencies
+	var dependencies []sonatype.Component
+	for _, cord := range coordinates {
+		dep, dErr := sonatype.FetchAllDependencies(fmt.Sprintf("pkg:maven/%s/%s@%s", cord.GroupId, cord.ArtifactId, cord.Version))
+		if dErr != nil {
+			slog.Error("Error fetching transitive dependencies", "err", err)
+			return c.JSON(http.StatusInternalServerError, "internal server error")
+		}
+
+		dependencies = append(dependencies, dep...)
+	}
+	dependencies = slices.CompactFunc(dependencies, sonatype.ComponentEquals)
+
+	// evaluate dependencies
+	var allDependencies []string
+	var reproducibleDependencies []string
+	for _, dep := range dependencies {
+		allDependencies = append(allDependencies, fmt.Sprintf("%s:%s:%s", dep.DependencyNamespace, dep.DependencyName, dep.DependencyVersion))
+
+		dResult, dErr := h.lookupService.LookupDependencyVersion(registry, model.GAV{GroupId: dep.DependencyNamespace, ArtifactId: dep.DependencyName, Version: dep.DependencyVersion})
+		if dErr != nil {
+			continue
+		}
+
+		if dResult.FileStats.TotalNonReproducibleFiles == 0 {
+			reproducibleDependencies = append(reproducibleDependencies, fmt.Sprintf("%s:%s:%s", dep.DependencyNamespace, dep.DependencyName, dep.DependencyVersion))
+		}
+	}
+
+	// badge
+	badgeText := fmt.Sprintf("%d/%d dep(s)", len(reproducibleDependencies), len(allDependencies))
+	badgeStatus := util.Ternary(len(reproducibleDependencies) == len(allDependencies), badge.Success, badge.Warning)
 	return c.JSON(http.StatusOK, badge.NewDependencyBadge(
 		badgeText,
 		badgeStatus,
