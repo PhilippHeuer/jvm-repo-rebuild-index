@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"embed"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,6 +17,9 @@ type handlers struct {
 
 var ErrStartingServer = errors.New("error starting server")
 
+//go:embed public
+var staticAssets embed.FS
+
 func Serve(port int, indexDir string, indexURL string) error {
 	// config
 	e := echo.New()
@@ -23,8 +27,18 @@ func Serve(port int, indexDir string, indexURL string) error {
 	e.HidePort = true
 
 	// middlewares
-	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
+	e.Use(
+		middleware.Recover(),
+		middleware.CORSWithConfig(
+			middleware.CORSConfig{
+				AllowOrigins: []string{"*"},
+			},
+		),
+		middleware.StaticWithConfig(middleware.StaticConfig{
+			Root:       "public",
+			Filesystem: http.FS(staticAssets),
+		}),
+	)
 
 	// services
 	handlerStruct := handlers{

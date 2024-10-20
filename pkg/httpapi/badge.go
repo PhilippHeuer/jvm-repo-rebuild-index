@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 
 	"github.com/labstack/echo/v4"
@@ -20,6 +21,16 @@ func (h handlers) projectBadgeHandler(c echo.Context) error {
 	coordinate := c.Param("coordinate")
 	artifactVersion := c.Param("version")
 	theme := c.QueryParam("theme")
+
+	registry, err := url.QueryUnescape(registry)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "failed to decode registry")
+	}
+	coordinate, err = url.QueryUnescape(coordinate)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "failed to decode coordinate")
+	}
+
 	if registry == "" {
 		registry = "repo.maven.apache.org/maven2" // default to Maven Central
 	}
@@ -71,6 +82,16 @@ func (h handlers) dependencyBadgeHandler(c echo.Context) error {
 	artifactVersion := c.Param("version")
 	theme := c.QueryParam("theme")
 	scope := c.QueryParam("scope") // project or module
+
+	registry, err := url.QueryUnescape(registry)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "failed to decode registry")
+	}
+	coordinate, err = url.QueryUnescape(coordinate)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "failed to decode coordinate")
+	}
+
 	if registry == "" {
 		registry = "repo.maven.apache.org/maven2" // default to Maven Central
 	}
@@ -132,6 +153,16 @@ func (h handlers) transitiveDependencyBadgeHandler(c echo.Context) error {
 	coordinate := c.Param("coordinate")
 	artifactVersion := c.Param("version")
 	theme := c.QueryParam("theme")
+
+	registry, err := url.QueryUnescape(registry)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "failed to decode registry")
+	}
+	coordinate, err = url.QueryUnescape(coordinate)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, "failed to decode coordinate")
+	}
+
 	if registry == "" {
 		registry = "repo.maven.apache.org/maven2" // default to Maven Central
 	}

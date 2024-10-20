@@ -1,0 +1,150 @@
+openapi: 3.0.3
+info:
+  title: JVM-Rebuild API
+  description: JVM-Rebuild API
+  version: 1.0.0
+
+servers:
+  - url: https://jvm-rebuild.philippheuer.de
+
+tags:
+  - name: badge
+    description: Badge Endpoints for Shields.io
+
+paths:
+  /v1/badge/reproducible/project/{registry}/{coordinate}/{version}:
+    get:
+      tags:
+        - badge
+      summary: Get project badge
+      description: |
+        Query the reproducibility status of a project by jvm-repo-rebuild id.
+        This endpoint returns a json payload that is used by shields.io to render a badge.
+      operationId: getProjectReproducibilityBadgeV1
+      parameters:
+        - $ref: '#/components/parameters/registry'
+        - $ref: '#/components/parameters/coordinate'
+        - $ref: '#/components/parameters/version'
+        - $ref: '#/components/parameters/theme'
+      responses:
+        "200":
+          $ref: '#/components/responses/ShieldsIOEndpointBadge'
+  /v1/badge/reproducible/maven/{registry}/{coordinate}/{version}:
+    get:
+      tags:
+        - badge
+      summary: Get reproducible maven badge
+      description: |
+        Query the reproducibility status of a maven artifact by gav coordinates (groupId, artifactId, version).
+        This endpoint returns a json payload that is used by shields.io to render a badge.
+      operationId: getMavenReproducibilityBadgeV1
+      parameters:
+        - $ref: '#/components/parameters/registry'
+        - $ref: '#/components/parameters/coordinate'
+        - $ref: '#/components/parameters/version'
+        - $ref: '#/components/parameters/theme'
+      responses:
+        "200":
+          $ref: '#/components/responses/ShieldsIOEndpointBadge'
+  /v1/badge/reproducible-dependencies/maven/{registry}/{coordinate}/{version}:
+    get:
+      tags:
+        - badge
+      summary: Get reproducible maven badge
+      description: |
+        Query the reproducibility status of all dependencies of a maven artifact by gav coordinates (groupId, artifactId, version).
+        This endpoint returns a json payload that is used by shields.io to render a badge.
+      operationId: getMavenReproducibilityBadgeForDependenciesV1
+      parameters:
+        - $ref: '#/components/parameters/registry'
+        - $ref: '#/components/parameters/coordinate'
+        - $ref: '#/components/parameters/version'
+        - $ref: '#/components/parameters/theme'
+      responses:
+        "200":
+          $ref: '#/components/responses/ShieldsIOEndpointBadge'
+  # redirect to readme
+
+components:
+  parameters:
+    registry:
+      name: registry
+      in: path
+      description: |
+        This parameter can be used to specify the maven registry, if multiple registries are supported in the future.
+      required: true
+      schema:
+        type: string
+        example: "repo1.maven.org/maven2"
+        default: "repo1.maven.org/maven2"
+    coordinate:
+      name: coordinate
+      in: path
+      description: The maven coordinate
+      required: true
+      schema:
+        type: string
+        example: "io.github.xanthic.cache:cache-core"
+    version:
+      name: version
+      in: path
+      description: The maven version, e.g. 0.6.2 - you may also use "latest" to get the latest version
+      required: true
+      schema:
+          type: string
+          example: "0.6.2"
+    theme:
+      name: theme
+      in: query
+      description: The badge theme
+      required: false
+      schema:
+        type: string
+        example: "renovate"
+        enum:
+          - default
+          - renovate
+  responses:
+    ShieldsIOEndpointBadge:
+      description: json for shields.io endpoint badge
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ShieldsIOEndpointBadge'
+  schemas:
+    ShieldsIOEndpointBadge:
+      type: object
+      properties:
+          schemaVersion:
+              type: integer
+              example: 1
+          label:
+              type: string
+              example: "Reproducible"
+          message:
+              type: string
+              example: "Yes"
+          color:
+              type: string
+              example: "green"
+          labelColor:
+              type: string
+              example: "blue"
+          isError:
+              type: boolean
+              example: false
+          namedLogo:
+              type: string
+              example: "maven"
+          logoSvg:
+              type: string
+              example: "<svg>...</svg>"
+          logoColor:
+              type: string
+              example: "blue"
+          logoWidth:
+              type: string
+              example: "20"
+          style:
+              type: string
+              example: "flat"
